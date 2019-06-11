@@ -94,9 +94,9 @@ class Model:
 class Transform:
 
     def __init__(self, location=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1)):
-        self.location = Vector3D(location)
-        self.rotation = Vector3D(rotation)
-        self.scale    = Vector3D(scale)
+        self.location = Vector3D(*location)
+        self.rotation = Vector3D(*rotation)
+        self.scale    = Vector3D(*scale)
 
     def matrix(self):
         return create_transformation_matrix(
@@ -187,7 +187,7 @@ class Font:
 
 class Camera:
 
-    def __init__(self, look_at=None, distance=5, fov=90,
+    def __init__(self, position, fov=90,
                  maximum_render_distance=1000.0, minimum_render_distance=0.1):
 
         self.position  = Vector3D(*position)
@@ -199,7 +199,7 @@ class Camera:
         self.up    = Vector3D(0, 1, 0)
         self.front = Vector3D(0, 0, -1)
 
-        self.function = function
+        # self.function = function
 
     def rotate(self, yaw=0.0, pitch=0.0, roll=0.0):
         pass
@@ -208,11 +208,11 @@ class Camera:
         self.position += (self.right * right + self.up * up + self.front * forward)
 
     def update(self, *args, **kwargs):
-        if self.function:
-            pass
+        # if self.function:
+        pass
 
     def transformation_matrix(self):
-        return create_transformation_matrix(*self.position, self.rotation.y, self.rotation.x, 0, 1, 1, 1)
+        return create_transformation_matrix(*self.position, 0, 0, 0, 1, 1, 1)
 
     def perspective_matrix(self):
         return create_perspective_matrix(self.fov, window.width / window.height, self.minimum_render_distance, self.maximum_render_distance)

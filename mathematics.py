@@ -170,6 +170,9 @@ class Vector3D:
         elif key == 2: self.z = value
         else: raise IndexError
 
+    def __len__(self):
+        return 3
+
     def map(self, func, *args, **kwargs):
         x = func(self.x, *args, **kwargs)
         y = func(self.y, *args, **kwargs)
