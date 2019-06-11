@@ -94,9 +94,9 @@ class Model:
 class Transform:
 
     def __init__(self, location=(0, 0, 0), rotation=(0, 0, 0), scale=(1, 1, 1)):
-        self.location = Vector3D(location)
-        self.rotation = Vector3D(rotation)
-        self.scale    = Vector3D(scale)
+        self.location = Vector3D(*location)
+        self.rotation = Vector3D(*rotation)
+        self.scale    = Vector3D(*scale)
 
     def matrix(self):
         return create_transformation_matrix(
@@ -187,32 +187,44 @@ class Font:
 
 class Camera:
 
-    def __init__(self, look_at=None, distance=5, fov=90,
+    def __init__(self, target=None, offset=(0, 0, 0), distance=1, pitch=0, yaw=0, fov=90,
                  maximum_render_distance=1000.0, minimum_render_distance=0.1):
 
-        self.position  = Vector3D(*position)
+        self.target = target
+        self.offset = offset
+        self.distance = distance
+
+        self.pitch = pitch
+        self.yaw = yaw
         self.fov = fov
+
         self.maximum_render_distance = maximum_render_distance
         self.minimum_render_distance = minimum_render_distance
 
-        self.right = Vector3D(1, 0, 0)
-        self.up    = Vector3D(0, 1, 0)
-        self.front = Vector3D(0, 0, -1)
+        self.right = Vector3D(1,  0,  0)
+        self.up    = Vector3D(0,  1,  0)
+        self.front = Vector3D(0,  0, -1)
 
-        self.function = function
-
-    def rotate(self, yaw=0.0, pitch=0.0, roll=0.0):
-        pass
-
-    def move(self, forward=0, right=0, up=0):
-        self.position += (self.right * right + self.up * up + self.front * forward)
+        if self.target:
+            self._position = self.target.transformation.location
+        else:
+            self._position = Vector3D(0, 0, 0)
 
     def update(self, *args, **kwargs):
-        if self.function:
-            pass
+        if self.target:
+            self._position = self.target.transformation.location
+            x = sin(self.yaw)
+            y = sin(self.pitch)
+            z = -cos(self.yaw)
+            offset = Vector3D(x, y, z).normalize() * self.distance
+
+            self._position += offset
 
     def transformation_matrix(self):
-        return create_transformation_matrix(*self.position, self.rotation.y, self.rotation.x, 0, 1, 1, 1)
+        return create_transformation_matrix(*self._position, radians(self.pitch), radians(self.yaw), 0, 1, 1, 1)
+
+    def view_matrix(self):
+        return create_transformation_matrix(*(-self._position), radians(self.pitch), radians(self.yaw), 0, 1, 1, 1)
 
     def perspective_matrix(self):
         return create_perspective_matrix(self.fov, window.width / window.height, self.minimum_render_distance, self.maximum_render_distance)
@@ -225,7 +237,7 @@ def follow(target, distance, offset=(0, 0, 0)):
     return func
 
 
-def create_transformation_matrix(x, y, z, rx, ry, rz, sx, sy, sz):
+def create_transformation_matrix(x, y, z, rx, ry, rz, sx, sy, sz):  # Angles in radians.
     # TODO optimize by creating the transformation matrix directly.
     translation = numpy.array(
         ((1, 0, 0, x),
@@ -304,6 +316,7 @@ def create_shader_program(sources, attributes, uniforms):
     for attribute in attributes:
         attribute_mapping.append(create_string_buffer(attribute))
 
+    program_handle = -1
     try:
         # Create program.
         program_handle = glCreateProgram()
@@ -390,7 +403,6 @@ def create_model(vertices, texture_coordinates, normals, indices):
 
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0)
 
-    # CHANGED
     vbos = VBO(vbo, 3), VBO(texture_coordinates_vbo, 2), VBO(normal_vbo, 3)
     return Model(vbos=vbos, indexed_vbo=indexed_vbo, count=len(indices))
 
@@ -597,8 +609,8 @@ def on_draw():
 
     # Setup light shader
     light_program.enable()
-    light_program.load_uniform_matrix(name='perspective', data=camera.transformation_matrix())
-    light_program.load_uniform_matrix(name='view', data=camera.transformation_matrix())
+    light_program.load_uniform_matrix(name='perspective', data=camera.perspective_matrix())
+    light_program.load_uniform_matrix(name='view', data=camera.view_matrix())
 
 
     # Render lights
@@ -615,7 +627,7 @@ def on_draw():
     # Setup block shader
     program.enable()
     program.load_uniform_matrix(name='perspective', data=camera.perspective_matrix())
-    program.load_uniform_matrix(name='view', data=camera.transformation_matrix())
+    program.load_uniform_matrix(name='view', data=camera.view_matrix())
 
     # Upload lights to block shader
     for i, light in enumerate(lights):
@@ -658,7 +670,7 @@ def on_draw():
 
     simple_2D_program.enable()
     simple_2D_program.load_uniform_matrix(name='perspective', data=camera.perspective_matrix())
-    simple_2D_program.load_uniform_matrix(name='view', data=camera.transformation_matrix())
+    simple_2D_program.load_uniform_matrix(name='view', data=camera.view_matrix())
 
     simple_2D_program.load_uniform_matrix(name='transformation', data=text_transform.matrix())
     simple_2D_program.load_uniform_floats(name='color', data=(255, 255, 255))
@@ -672,27 +684,35 @@ def on_draw():
 
 def update(dt):
 
-    speed = 10 * dt
+    movement_speed = 10 * dt
+    rotation_speed = pi * dt
 
     for symbol in key_state:
 
         if symbol == key.A:
-            camera.move(right=-speed)
+            camera._position.x -= movement_speed
         elif symbol == key.D:
-            camera.move(right=speed)
+            camera._position.x += movement_speed
+        elif symbol == key.LCTRL:
+            camera._position.y -= movement_speed
         elif symbol == key.LSHIFT:
-            camera.move(up=-speed)
-        elif symbol == key.SPACE:
-            camera.move(up=speed)
+            camera._position.y += movement_speed
         elif symbol == key.W:
-            camera.move(forward=speed)
+            camera._position.z -= movement_speed
         elif symbol == key.S:
-            camera.move(forward=-speed)
+            camera._position.z += movement_speed
 
-        elif symbol == key.Q:
-            camera.rotate(yaw=-speed)
+        if symbol == key.Z:
+            camera.pitch += rotation_speed
+        elif symbol == key.C:
+            camera.pitch -= rotation_speed
+        if symbol == key.Q:
+            camera.yaw -= rotation_speed
         elif symbol == key.E:
-            camera.rotate(yaw=speed)
+            camera.yaw += rotation_speed
+
+    #camera.update()
+    #camera.target = all_entities[entity_selected]
 
 
 if __name__ == '__main__':
@@ -876,7 +896,7 @@ if __name__ == '__main__':
         attributes=['position', 'texture_coordinate', 'normal'],
         uniforms=['transformation', 'perspective', 'view', 'texture_offset',
                 *['light[{}].{}'.format(i, attribute) for attribute in
-                 ['position', 'color', 'intensity', 'constant', 'linear', 'quadratic'] for i in range(4)]
+                 ['position', 'color', 'constant', 'linear', 'quadratic'] for i in range(1)]
         ]
     )
 
@@ -891,7 +911,6 @@ if __name__ == '__main__':
         attributes=['position'],
         uniforms=['transformation', 'perspective', 'view', 'color']
     )
-
 
     font_arial = Font('fonts/arial.fnt')
     text_transform = Transform(location=(-1, 1, 0), rotation=(0, 0, 0), scale=(0.6, 0.6, 0.6))
@@ -911,7 +930,7 @@ if __name__ == '__main__':
     entity_selected = 0
     all_entities = [*blocks, *lights]
 
-    camera = Camera(position=(0, 1, 0))
+    camera = Camera()
 
     pyglet.clock.schedule(update)
     pyglet.app.run()

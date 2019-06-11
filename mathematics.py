@@ -43,6 +43,9 @@ class Vector2D:
     __rsub__ = __sub__
     __rmul__ = __mul__
 
+    def __neg__(self):
+        return Vector2D(-self.x, -self.y)
+
     def __iter__(self):
         yield self.x
         yield self.y
@@ -56,6 +59,9 @@ class Vector2D:
         if   key == 0: self.x = value
         elif key == 1: self.y = value
         else: raise IndexError
+
+    def __len__(self):  # DIMENSION! NOT LENGTH!
+        return 2
 
     def map(self, func, *args, **kwargs):
         x = func(self.x, *args, **kwargs)
@@ -153,6 +159,9 @@ class Vector3D:
     __rsub__ = __sub__
     __rmul__ = __mul__
 
+    def __neg__(self):
+        return Vector3D(-self.x, -self.y, -self.z)
+
     def __iter__(self):
         yield self.x
         yield self.y
@@ -169,6 +178,9 @@ class Vector3D:
         elif key == 1: self.y = value
         elif key == 2: self.z = value
         else: raise IndexError
+
+    def __len__(self):  # DIMENSION! NOT LENGTH!
+        return 3
 
     def map(self, func, *args, **kwargs):
         x = func(self.x, *args, **kwargs)
